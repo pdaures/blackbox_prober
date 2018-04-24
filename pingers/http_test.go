@@ -44,28 +44,10 @@ func TestHTTP(t *testing.T) {
 			t.Fatal("Expected non-zero value")
 		}
 
-		statusCode.WithLabelValues(server.URL).Write(pb)
+		metrics.StatusCode.WithLabelValues(server.URL).Write(pb)
 		if expected, got := float64(200), pb.Gauge.GetValue(); expected != got {
 			t.Fatalf("Expected: %f, Got: %f", expected, got)
 		}
 
-	}
-}
-
-func TestHTTPSExpire(t *testing.T) {
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, payload)
-	}))
-
-	u, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pingerHTTP(u, metrics)
-
-	pb := &dto.Metric{}
-	expireTimestamp.WithLabelValues(server.URL).Write(pb)
-	if expected, got := 3.6e+09, pb.Gauge.GetValue(); expected != got {
-		t.Fatalf("Expected: %f, Got: %f", expected, got)
 	}
 }

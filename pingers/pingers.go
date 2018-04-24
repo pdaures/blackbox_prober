@@ -25,10 +25,12 @@ var (
 
 // Metrics holds the prometheus metrics common among all pingers
 type Metrics struct {
-	Up      *prometheus.GaugeVec
-	Latency *prometheus.GaugeVec
-	Size    *prometheus.GaugeVec
-	Expires *prometheus.GaugeVec
+	Up              *prometheus.GaugeVec
+	Latency         *prometheus.GaugeVec
+	Size            *prometheus.GaugeVec
+	Expires         *prometheus.GaugeVec
+	ExpireTimestamp *prometheus.GaugeVec
+	StatusCode      *prometheus.GaugeVec
 }
 
 func readSize(r io.Reader) (int, error) {

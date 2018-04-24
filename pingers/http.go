@@ -7,29 +7,13 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
 	insecure = flag.Bool("ping.insecure", false, "Disable validation of server certificate for https.")
-
-	expireTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "cert_expire_timestamp",
-		Help:      "Certificate expiry date in seconds since epoch.",
-	}, []string{"url"})
-
-	statusCode = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Name:      "response_code",
-		Help:      "HTTP response code.",
-	}, []string{"url"})
 )
 
 func init() {
-	prometheus.MustRegister(expireTimestamp)
-	prometheus.MustRegister(statusCode)
 	pingers["http"] = pingerHTTP
 	pingers["https"] = pingerHTTP
 }
@@ -58,9 +42,12 @@ func pingerHTTP(url *url.URL, m Metrics) {
 
 	m.Latency.WithLabelValues(url.String()).Set(time.Since(start).Seconds())
 	m.Size.WithLabelValues(url.String()).Set(float64(size))
-	m.Up.WithLabelValues(url.String()).Set(1)
-
-	statusCode.WithLabelValues(url.String()).Set(float64(resp.StatusCode))
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		m.Up.WithLabelValues(url.String()).Set(1)
+	} else {
+		m.Up.WithLabelValues(url.String()).Set(0)
+	}
+	m.StatusCode.WithLabelValues(url.String()).Set(float64(resp.StatusCode))
 
 	if resp.TLS != nil {
 		var expires time.Time
@@ -69,6 +56,6 @@ func pingerHTTP(url *url.URL, m Metrics) {
 		} else {
 			expires = resp.TLS.VerifiedChains[0][0].NotAfter
 		}
-		expireTimestamp.WithLabelValues(url.String()).Set(float64(expires.Unix()))
+		m.ExpireTimestamp.WithLabelValues(url.String()).Set(float64(expires.Unix()))
 	}
 }

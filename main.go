@@ -9,8 +9,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/jswank/blackbox_prober/pingers"
+	"github.com/pdaures/blackbox_prober/pingers"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -49,6 +50,17 @@ func NewPingCollector(targets targets) *pingCollector {
 				Name:      "size_bytes",
 				Help:      "Size of request for url",
 			}, []string{"url"}),
+			ExpireTimestamp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: pingers.Namespace,
+				Name:      "cert_expire_timestamp",
+				Help:      "Certificate expiry date in seconds since epoch.",
+			}, []string{"url"}),
+
+			StatusCode: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: pingers.Namespace,
+				Name:      "response_code",
+				Help:      "HTTP response code.",
+			}, []string{"url"}),
 		},
 	}
 }
@@ -70,6 +82,8 @@ func (c pingCollector) Collect(ch chan<- prometheus.Metric) {
 	c.metrics.Up.Collect(ch)
 	c.metrics.Latency.Collect(ch)
 	c.metrics.Size.Collect(ch)
+	c.metrics.ExpireTimestamp.Collect(ch)
+	c.metrics.StatusCode.Collect(ch)
 }
 
 // Describe implements prometheus.Collector.
@@ -77,6 +91,8 @@ func (c pingCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.metrics.Up.Describe(ch)
 	c.metrics.Latency.Describe(ch)
 	c.metrics.Size.Describe(ch)
+	c.metrics.ExpireTimestamp.Describe(ch)
+	c.metrics.StatusCode.Describe(ch)
 }
 
 type targets []*url.URL
@@ -105,9 +121,8 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
-	log.Println("WARNING: This tool will be deprecated soon in favor of https://github.com/prometheus/blackbox_exporter")
 	log.Printf("blackbox_prober v%s providing metrics for %v on %s%s", Version, targets, *listenAddress, *metricsPath)
 	prometheus.MustRegister(NewPingCollector(targets))
-	http.Handle(*metricsPath, prometheus.Handler())
+	http.Handle(*metricsPath, promhttp.Handler())
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }

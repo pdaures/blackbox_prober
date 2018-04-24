@@ -19,5 +19,16 @@ var (
 			Name:      "size_bytes",
 			Help:      "Size of request for url",
 		}, []string{"url"}),
+		ExpireTimestamp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Name:      "cert_expire_timestamp",
+			Help:      "Certificate expiry date in seconds since epoch.",
+		}, []string{"url"}),
+
+		StatusCode: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: Namespace,
+			Name:      "response_code",
+			Help:      "HTTP response code.",
+		}, []string{"url"}),
 	}
 )
