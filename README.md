@@ -3,8 +3,6 @@ Please use https://github.com/prometheus/blackbox_exporter instead.
 
 # Blackbox Prober
 
-[![Build Status](https://travis-ci.org/jswank/blackbox_prober.svg)](https://travis-ci.org/jswank/blackbox_prober)
-
 Export blackbox telemetry like availability, request latencies and
 request size for remote services.
 
@@ -40,13 +38,3 @@ Execute `ping`. Port and path are ignored.
       -u https://5pi.de \
       -u icmp://192.168.178.1 \
       -u tcp://freigeist.org:655
-
-## Using Docker
-
-    docker pull jswank/blackbox_prober
-
-    docker run -d -p 9110:9110 jswank/blackbox_prober \
-        -u http://5pi.de \
-        -u https://5pi.de \
-        -u icmp://192.168.178.1 \
-        -u tcp://freigeist.org:655
