@@ -20,7 +20,10 @@ Execute `ping`. Port and path are ignored.
 # Example
 See blackbox_example.yml for configuration
 
-# How to build
+# Build
+## Requirements
+go 1.10+ installed
+
 ## Build for your environment
 `make all`
 
