@@ -54,7 +54,6 @@ func NewReporter(namespace string, tags map[string]string) *Reporter {
 		}, tagNames),
 		otherMetrics: make(map[string]*prometheus.GaugeVec),
 	}
-
 }
 
 func (r *Reporter) ReportLatency(latency float64, url *url.URL) {
@@ -88,11 +87,12 @@ func (r *Reporter) withLabelValues(g *prometheus.GaugeVec, url *url.URL) prometh
 
 	values := []string{}
 	for _, tagName := range r.tagNames {
-		if tagName == urlTag {
+		switch tagName {
+		case urlTag:
 			values = append(values, urlStr)
-		} else if tagName == hostTag {
+		case hostTag:
 			values = append(values, hostname)
-		} else {
+		default:
 			values = append(values, r.tags[tagName])
 		}
 	}
