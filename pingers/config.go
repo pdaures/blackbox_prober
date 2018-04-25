@@ -41,7 +41,7 @@ type HTTPRule struct {
 	BodyRegex         string         `yaml:"body_regexp,omitempty"`  // if set, the HTTP response body must match BodyRegex
 	CompiledRegex     *regexp.Regexp `yaml:"-"`
 	Insecure          bool           `yaml:"insecure,omitempty"`
-	ReadMax           int64          `yaml:read_max,omitempty`
+	ReadMax           int64          `yaml:"read_max,omitempty"`
 }
 
 // Target is a the definition of the check to execute (which rule on which endpoint)
@@ -51,9 +51,10 @@ type Target struct {
 	Rule *Rule
 }
 
+// NewTargets creates from the configuration the list of Target to be queried, and registers metrics on the way
 func NewTargets(c *Configuration, metricMaker MetricMaker) ([]*Target, error) {
 	for _, rule := range c.Rules {
-		err := rule.Setup(metricMaker)
+		err := rule.setup(metricMaker)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +81,7 @@ func NewTargets(c *Configuration, metricMaker MetricMaker) ([]*Target, error) {
 	return targets, nil
 }
 
-func (r *Rule) Setup(metricMaker MetricMaker) error {
+func (r *Rule) setup(metricMaker MetricMaker) error {
 	if r.MetricName == "" {
 		r.MetricName = DefaultMetricName
 	}
@@ -94,7 +95,7 @@ func (r *Rule) Setup(metricMaker MetricMaker) error {
 		if r.HTTPRule == nil {
 			r.HTTPRule = &HTTPRule{}
 		}
-		err := r.HTTPRule.Setup()
+		err := r.HTTPRule.setup()
 		return err
 	case "tcp":
 		return nil
@@ -103,7 +104,7 @@ func (r *Rule) Setup(metricMaker MetricMaker) error {
 	}
 }
 
-func (r *HTTPRule) Setup() error {
+func (r *HTTPRule) setup() error {
 	if r.BodyRegex != "" {
 		if r.BodyContent != "" {
 			return fmt.Errorf("body_regexp and body_content are mutually exclusive")
