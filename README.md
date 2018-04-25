@@ -17,5 +17,12 @@ will try to read until EOF which is required for exposing the size.
 ### icmp
 Execute `ping`. Port and path are ignored.
 
-## Example
+# Example
 See blackbox_example.yml for configuration
+
+# How to build
+## Build for your environment
+`make all`
+
+## Build for linux
+`make build-linux`
