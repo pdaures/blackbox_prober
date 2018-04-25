@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	listenAddress = flag.String("web.listen-address", ":9110", "Address to listen on for web interface and telemetry.")
-	metricsPath   = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	configPath    = flag.String("conf.file-path", "blackbox.yml", "Configuration file path.")
+	listenAddress = flag.String("web-listen-address", ":9110", "Address to listen on for web interface and telemetry.")
+	metricsPath   = flag.String("web-telemetry-path", "/metrics", "Path under which to expose metrics.")
+	configPath    = flag.String("conf-path", "blackbox.yml", "Configuration file path.")
 
 	errURLNotAbsolute = errors.New("URL not absolute")
 	errNoPinger       = errors.New("No pinger for schema")
@@ -65,6 +65,8 @@ func (c pingCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func main() {
+	flag.Parse()
+
 	fmt.Printf("Starting blackbox-exporter on %s%s, using configuration file: %s\n", *metricsPath, *listenAddress, *configPath)
 	b, err := ioutil.ReadFile(*configPath)
 	if err != nil {
