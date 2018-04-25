@@ -20,4 +20,7 @@ clean:
 
 # Cross compilation
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY_LINUX) -v
+	CGO_ENABLED=0 GOOS=linux $(GOBUILD) -a -tags netgo -ldflags '-w' -o $(BINARY_LINUX) .
+
+docker: build-linux
+	docker build .

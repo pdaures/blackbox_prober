@@ -26,3 +26,7 @@ See blackbox_example.yml for configuration
 
 ## Build for linux
 `make build-linux`
+
+## Build a docker image
+`make docker`
+The docker image may have issues with HTTPS certificates
