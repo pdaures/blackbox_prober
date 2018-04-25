@@ -22,8 +22,7 @@ var (
 	metricsPath   = flag.String("web-telemetry-path", "/metrics", "Path under which to expose metrics.")
 	configPath    = flag.String("conf-path", "blackbox.yml", "Configuration file path.")
 
-	errURLNotAbsolute = errors.New("URL not absolute")
-	errNoPinger       = errors.New("No pinger for schema")
+	errNoPinger = errors.New("No pinger for schema")
 )
 
 func main() {
