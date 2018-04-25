@@ -4,7 +4,7 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
-BINARY_NAME=blackbox_exporter
+BINARY_NAME=blackbox_prober
 BINARY_LINUX=$(BINARY_NAME)_linux_amd64
     
 all: test build
