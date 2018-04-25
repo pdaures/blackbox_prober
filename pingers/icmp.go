@@ -9,19 +9,14 @@ import (
 	"time"
 )
 
-func init() {
-	pingers["icmp"] = pingerICMP
-}
-
-func pingerICMP(url *url.URL, m Metrics) {
+func pingerICMP(url *url.URL, reporter *Reporter, c *Rule) error {
 	hostPort := strings.Split(url.Host, ":")
 	start := time.Now()
-	err := exec.Command("ping", "-n", "-c", "1", "-W", strconv.Itoa(int(timeout.Seconds())), hostPort[0]).Run()
+	err := exec.Command("ping", "-n", "-c", "1", "-W", strconv.Itoa(c.Timeout), hostPort[0]).Run()
 	if err != nil {
 		log.Printf("Couldn't ping %s: %s", url, err)
-		m.Up.WithLabelValues(url.String()).Set(0)
-		return
+		return reporter.ReportSuccess(false, c.MetricName, url)
 	}
-	m.Latency.WithLabelValues(url.String()).Set(time.Since(start).Seconds())
-	m.Up.WithLabelValues(url.String()).Set(1)
+	reporter.ReportLatency(time.Since(start).Seconds(), url)
+	return reporter.ReportSuccess(true, c.MetricName, url)
 }

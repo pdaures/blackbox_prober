@@ -7,29 +7,25 @@ import (
 	"time"
 )
 
-func init() {
-	pingers["tcp"] = pingerTCP
-}
-
-func pingerTCP(url *url.URL, m Metrics) {
+func pingerTCP(url *url.URL, reporter *Reporter, c *Rule) error {
+	timeoutDuration := time.Second * time.Duration(c.Timeout)
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", url.Host, *timeout)
+	conn, err := net.DialTimeout("tcp", url.Host, timeoutDuration)
 	if err != nil {
 		log.Printf("Couldn't connect to %s: %s", url.Host, err)
-		m.Up.WithLabelValues(url.String()).Set(0)
-		return
+		return reporter.ReportSuccess(false, c.MetricName, url)
 	}
 	defer conn.Close()
 	if url.Path != "" {
-		conn.SetDeadline(time.Now().Add(*timeout))
+		conn.SetDeadline(time.Now().Add(timeoutDuration))
 
 		size, err := readSize(conn)
 		if err != nil {
 			log.Printf("Error reading from %s: %s", url, err)
-			m.Up.WithLabelValues(url.String()).Set(0)
+			return reporter.ReportSuccess(false, c.MetricName, url)
 		}
-		m.Size.WithLabelValues(url.String()).Set(float64(size))
+		reporter.ReportSize(size, url)
 	}
-	m.Latency.WithLabelValues(url.String()).Set(time.Since(start).Seconds())
-	m.Up.WithLabelValues(url.String()).Set(1)
+	reporter.ReportLatency(time.Since(start).Seconds(), url)
+	return reporter.ReportSuccess(true, c.MetricName, url)
 }

@@ -1,61 +1,74 @@
 package pingers
 
 import (
+	"bytes"
 	"crypto/tls"
-	"flag"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"time"
 )
 
-var (
-	insecure = flag.Bool("ping.insecure", false, "Disable validation of server certificate for https.")
-)
-
-func init() {
-	pingers["http"] = pingerHTTP
-	pingers["https"] = pingerHTTP
-}
-
-func pingerHTTP(url *url.URL, m Metrics) {
+func pingerHTTP(url *url.URL, reporter *Reporter, r *Rule) error {
+	httpRule := r.HTTPRule
+	metricName := r.MetricName
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig:   &tls.Config{InsecureSkipVerify: *insecure},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: httpRule.Insecure},
 			DisableKeepAlives: true,
 		},
-		Timeout: *timeout,
+		Timeout: time.Second * time.Duration(r.Timeout),
 	}
 	start := time.Now()
 	resp, err := client.Get(url.String())
 	if err != nil {
-		log.Printf("Couldn't get %s: %s", url, err)
-		m.Up.WithLabelValues(url.String()).Set(0)
-		return
+		log.Printf("Couldn't get %s: %v", url, err)
+		err = reporter.ReportSuccess(false, metricName, url)
+		return err
 	}
 	defer resp.Body.Close()
 
-	size, err := readSize(resp.Body)
+	body, err := ioutil.ReadAll(io.LimitReader(resp.Body, httpRule.ReadMax))
 	if err != nil {
-		log.Printf("Couldn't read from %s: %s", url, err)
+		log.Printf("Couldn't read HTTP body for %s: %v", url, err)
+		err = reporter.ReportSuccess(false, metricName, url)
+		return err
 	}
+	size := len(body)
+	reporter.ReportLatency(time.Since(start).Seconds(), url)
+	reporter.ReportSize(size, url)
+	reporter.ReportHttpStatus(resp.StatusCode, url)
 
-	m.Latency.WithLabelValues(url.String()).Set(time.Since(start).Seconds())
-	m.Size.WithLabelValues(url.String()).Set(float64(size))
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		m.Up.WithLabelValues(url.String()).Set(1)
-	} else {
-		m.Up.WithLabelValues(url.String()).Set(0)
+	match := matchBody(body, httpRule)
+	validStatus := validStatus(resp.StatusCode, httpRule)
+
+	ok := match && validStatus
+	return reporter.ReportSuccess(ok, metricName, url)
+}
+
+func matchBody(body []byte, httpRule *HTTPRule) bool {
+	if httpRule.CompiledRegex != nil {
+		return httpRule.CompiledRegex.Match(body)
 	}
-	m.StatusCode.WithLabelValues(url.String()).Set(float64(resp.StatusCode))
+	if httpRule.BodyContentBytes != nil && len(httpRule.BodyContentBytes) > 0 {
+		return bytes.Equal(bytes.TrimSpace(body), httpRule.BodyContentBytes)
+	}
+	return true
+}
 
-	if resp.TLS != nil {
-		var expires time.Time
-		if *insecure { // If insecure, we check the unverified certs
-			expires = resp.TLS.PeerCertificates[0].NotAfter
-		} else {
-			expires = resp.TLS.VerifiedChains[0][0].NotAfter
+func validStatus(status int, httpRule *HTTPRule) bool {
+	if httpRule.IgnoreHTTPStatus {
+		return true
+	}
+	if httpRule.ValidHTTPStatuses != nil && len(httpRule.ValidHTTPStatuses) > 0 {
+		for _, stat := range httpRule.ValidHTTPStatuses {
+			if stat == status {
+				return true
+			}
 		}
-		m.ExpireTimestamp.WithLabelValues(url.String()).Set(float64(expires.Unix()))
+		return false
 	}
+	return status >= http.StatusOK && status < http.StatusMultipleChoices
 }

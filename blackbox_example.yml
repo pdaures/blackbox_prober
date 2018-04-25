@@ -1,0 +1,35 @@
+namespace: "blackbox_exporter"
+tags:
+  env: local
+  custom: thing
+
+rules:
+  http_2xx:
+    type: "http"
+    # default metric_name: Up
+    # default_timeout: 10s
+
+  http_leadership:
+    type: "http"
+    metric_name: "custom_Up"
+    timeout: 4
+    http:
+      statuses:
+        - 200
+        - 403
+      body_regexp: "^.*true.*$"
+
+  tcp_active:
+    type: "tcp"
+
+targets:
+  http_2xx:
+    - "http://localhost:8090/healthz"
+    - "http://localhost:8081/healthz"
+
+  http_leadership:
+    - "http://localhost:8095/healthz"
+    - "http://localhost:8085/healthz"
+
+  tcp_active:
+    - "tcp://localhost:3306"
