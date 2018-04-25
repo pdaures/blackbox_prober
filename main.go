@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/pdaures/blackbox_prober/pingers"
@@ -25,26 +26,50 @@ var (
 	errNoPinger       = errors.New("No pinger for schema")
 )
 
-type pingCollector struct {
+func main() {
+	flag.Parse()
+
+	fmt.Printf("Starting blackbox-exporter on %s%s, using configuration file: %s\n", *metricsPath, *listenAddress, *configPath)
+	b, err := ioutil.ReadFile(*configPath)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	c := &pingers.Configuration{}
+	err = yaml.Unmarshal(b, c)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	pingCollector, err := newCollector(c)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	prometheus.MustRegister(pingCollector)
+	http.Handle(*metricsPath, promhttp.Handler())
+	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+}
+
+type collector struct {
 	reporter *pingers.Reporter
 	targets  []*pingers.Target
 }
 
-// newPingCollector returns a new pingCollector
-func newPingCollector(conf *pingers.Configuration) (*pingCollector, error) {
+func newCollector(conf *pingers.Configuration) (*collector, error) {
 	reporter := pingers.NewReporter(conf.Namespace, conf.Tags)
 	targets, err := pingers.NewTargets(conf, reporter)
 	if err != nil {
 		return nil, err
 	}
-	return &pingCollector{
+	return &collector{
 		reporter: reporter,
 		targets:  targets,
 	}, nil
 }
 
 // Collect implements prometheus.Collector.
-func (c pingCollector) Collect(ch chan<- prometheus.Metric) {
+func (c collector) Collect(ch chan<- prometheus.Metric) {
 	var wg sync.WaitGroup
 	for _, target := range c.targets {
 		wg.Add(1)
@@ -60,28 +85,6 @@ func (c pingCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // Describe implements prometheus.Collector.
-func (c pingCollector) Describe(ch chan<- *prometheus.Desc) {
+func (c collector) Describe(ch chan<- *prometheus.Desc) {
 	c.reporter.Describe(ch)
-}
-
-func main() {
-	flag.Parse()
-
-	fmt.Printf("Starting blackbox-exporter on %s%s, using configuration file: %s\n", *metricsPath, *listenAddress, *configPath)
-	b, err := ioutil.ReadFile(*configPath)
-	if err != nil {
-		panic(err)
-	}
-	c := &pingers.Configuration{}
-	err = yaml.Unmarshal(b, c)
-	if err != nil {
-		panic(err)
-	}
-	pingCollector, err := newPingCollector(c)
-	if err != nil {
-		panic(err)
-	}
-	prometheus.MustRegister(pingCollector)
-	http.Handle(*metricsPath, promhttp.Handler())
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
