@@ -1,4 +1,5 @@
 namespace: "blackbox_exporter"
+# List of tags that will be addded to all metrics
 tags:
   env: local
   custom: thing
@@ -6,18 +7,21 @@ tags:
 rules:
   http_2xx:
     type: "http"
-    # default metric_name: Up
-    # default_timeout: 10s
 
   http_leadership:
     type: "http"
+    # the default metric_name is Up
     metric_name: "custom_Up"
+    # the default timeout is 10s
     timeout: 4
     http:
+      # the default valid statuses are 200 <= status < 300
       statuses:
         - 200
         - 403
       body_regexp: "^.*true.*$"
+      # if insecure, then the TLS certificate won't be checked for HTTPS requests
+      insecure: true
 
   tcp_active:
     type: "tcp"

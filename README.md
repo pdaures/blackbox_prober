@@ -1,4 +1,4 @@
-# THIS IS DEPRECATED
+# IF POSSIBLE, USE BLACKBOX_EXPORTER
 Please use https://github.com/prometheus/blackbox_exporter instead.
 
 # Blackbox Prober
@@ -17,24 +17,5 @@ will try to read until EOF which is required for exposing the size.
 ### icmp
 Execute `ping`. Port and path are ignored.
 
-## Available metrics
-
-### All
-- `blackbox_up{url}` 1 if url is reachable, 0 if not
-- `blackbox_latency_seconds{url}` Latency of request for url
-
-### http/https
-- `blackbox_size_bytes{url}` Total size of response for url 
-- `blackbox_cert_expire_timestamp{url}` Expiry date of certificate (HTTPS only)
-- `blackbox_response_code{url}` Status code for the URL
-
-## tcp
-- `blackbox_size_bytes{url}` Size of the response
-
 ## Example
-
-    ./blackbox_prober \
-      -u http://5pi.de \
-      -u https://5pi.de \
-      -u icmp://192.168.178.1 \
-      -u tcp://freigeist.org:655
+See blackbox_example.yml for configuration
