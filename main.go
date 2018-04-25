@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	listenAddress = flag.String("web-listen-address", ":9110", "Address to listen on for web interface and telemetry.")
+	listenAddress = flag.String("web-listen-address", ":9115", "Address to listen on for web interface and telemetry.")
 	metricsPath   = flag.String("web-telemetry-path", "/metrics", "Path under which to expose metrics.")
 	configPath    = flag.String("conf-path", "blackbox.yml", "Configuration file path.")
 
