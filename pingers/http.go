@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func pingerHTTP(url *url.URL, reporter *Reporter, r *Rule) error {
+func pingerHTTP(url *url.URL, reporter MetricReporter, r *Rule) error {
 	httpRule := r.HTTPRule
 	metricName := r.MetricName
 	client := &http.Client{

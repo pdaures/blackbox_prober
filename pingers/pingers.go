@@ -29,7 +29,7 @@ func readSize(r io.Reader) (int, error) {
 
 // Ping executes the matching pinger function for the url.
 // If no pinger function can be found, it return ErrUnsupportedScheme.
-func Ping(target *Target, reporter *Reporter) error {
+func Ping(target *Target, reporter MetricReporter) error {
 	switch target.Rule.Type {
 	case "http":
 		return pingerHTTP(target.URL, reporter, target.Rule)

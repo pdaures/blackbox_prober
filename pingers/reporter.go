@@ -15,6 +15,14 @@ type MetricMaker interface {
 	MakeMetric(name string)
 }
 
+// MetricReporter reports metrics to Prometheus
+type MetricReporter interface {
+	ReportLatency(latency float64, url *url.URL)
+	ReportSize(size int, url *url.URL)
+	ReportHttpStatus(status int, url *url.URL)
+	ReportSuccess(success bool, metricName string, url *url.URL) error
+}
+
 type Reporter struct {
 	namespace    string
 	tags         map[string]string

@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-func pingerICMP(url *url.URL, reporter *Reporter, c *Rule) error {
-	hostPort := strings.Split(url.Host, ":")
+func pingerICMP(url *url.URL, reporter MetricReporter, c *Rule) error {
+	hostPort := strings.SplitN(url.Host, ":", 1)
 	start := time.Now()
 	err := exec.Command("ping", "-n", "-c", "1", "-W", strconv.Itoa(c.Timeout), hostPort[0]).Run()
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func pingerTCP(url *url.URL, reporter *Reporter, c *Rule) error {
+func pingerTCP(url *url.URL, reporter MetricReporter, c *Rule) error {
 	timeoutDuration := time.Second * time.Duration(c.Timeout)
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", url.Host, timeoutDuration)
