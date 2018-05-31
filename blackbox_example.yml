@@ -23,6 +23,11 @@ rules:
       # if insecure, then the TLS certificate won't be checked for HTTPS requests
       insecure: true
 
+      # you can use payload_extract to execute jq on the content and extract a numerical value
+      payload_extract:
+        metric_name:"content_count"
+        jq_query: ". | length"
+
   tcp_active:
     type: "tcp"
 

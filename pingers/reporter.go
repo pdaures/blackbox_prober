@@ -21,6 +21,7 @@ type MetricReporter interface {
 	ReportSize(size int, url *url.URL)
 	ReportHttpStatus(status int, url *url.URL)
 	ReportSuccess(success bool, metricName string, url *url.URL) error
+	ReportValue(val float64, metricName string, url *url.URL) error
 }
 
 type Reporter struct {
@@ -77,15 +78,19 @@ func (r *Reporter) ReportHttpStatus(status int, url *url.URL) {
 }
 
 func (r *Reporter) ReportSuccess(success bool, metricName string, url *url.URL) error {
-	metric, ok := r.otherMetrics[metricName]
-	if !ok {
-		return fmt.Errorf("metric %s unknown", metricName)
-	}
 	successValue := 0
 	if success {
 		successValue = 1
 	}
-	r.withLabelValues(metric, url).Set(float64(successValue))
+	return r.ReportValue(float64(successValue), metricName, url)
+}
+
+func (r *Reporter) ReportValue(val float64, metricName string, url *url.URL) error {
+	metric, ok := r.otherMetrics[metricName]
+	if !ok {
+		return fmt.Errorf("metric %s unknown", metricName)
+	}
+	r.withLabelValues(metric, url).Set(val)
 	return nil
 }
 

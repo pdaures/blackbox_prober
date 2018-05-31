@@ -3,11 +3,15 @@ package pingers
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -45,7 +49,39 @@ func pingerHTTP(url *url.URL, reporter MetricReporter, r *Rule) error {
 	validStatus := validStatus(resp.StatusCode, httpRule)
 
 	ok := match && validStatus
+	if ok && httpRule.PayloadExtract != nil {
+		val, err := extractValue(body, httpRule)
+		if err != nil {
+			fmt.Printf("cannot extract value from HTTP response, %v\n", err)
+		} else {
+			reporter.ReportValue(val, httpRule.PayloadExtract.MetricName, url)
+		}
+	}
 	return reporter.ReportSuccess(ok, metricName, url)
+}
+
+func extractValue(body []byte, httpRule *HTTPRule) (float64, error) {
+	cmd := exec.Command("jq", httpRule.PayloadExtract.JQQuery)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return 0, err
+	}
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, string(body))
+	}()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("error: cannot execute jq: %s\n", out)
+		return 0, err
+	}
+	outStr := fmt.Sprintf("%s", out)
+	outStr = strings.TrimSpace(outStr)
+	val, err := strconv.ParseFloat(outStr, 64)
+	if err != nil {
+		fmt.Printf("error: cannot convert %s to float, %v", out, err)
+	}
+	return val, err
 }
 
 func matchBody(body []byte, httpRule *HTTPRule) bool {

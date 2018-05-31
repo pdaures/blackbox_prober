@@ -34,14 +34,20 @@ type Rule struct {
 
 // HTTPRule contains the configuration for the list of http checks to do
 type HTTPRule struct {
-	IgnoreHTTPStatus  bool           `yaml:"ignore_http_status,omitempty"` // ignore HTTP status for health report
-	ValidHTTPStatuses []int          `yaml:"statuses,omitempty"`
-	BodyContentBytes  []byte         `yaml:"-"`
-	BodyContent       string         `yaml:"body_content,omitempty"` // if set, the HTTP response body must be BodyContent
-	BodyRegex         string         `yaml:"body_regexp,omitempty"`  // if set, the HTTP response body must match BodyRegex
-	CompiledRegex     *regexp.Regexp `yaml:"-"`
-	Insecure          bool           `yaml:"insecure,omitempty"`
-	ReadMax           int64          `yaml:"read_max,omitempty"`
+	IgnoreHTTPStatus  bool            `yaml:"ignore_http_status,omitempty"` // ignore HTTP status for health report
+	ValidHTTPStatuses []int           `yaml:"statuses,omitempty"`
+	BodyContentBytes  []byte          `yaml:"-"`
+	BodyContent       string          `yaml:"body_content,omitempty"` // if set, the HTTP response body must be BodyContent
+	BodyRegex         string          `yaml:"body_regexp,omitempty"`  // if set, the HTTP response body must match BodyRegex
+	CompiledRegex     *regexp.Regexp  `yaml:"-"`
+	PayloadExtract    *PayloadExtract `yaml:"payload_extract,omitempty"`
+	Insecure          bool            `yaml:"insecure,omitempty"`
+	ReadMax           int64           `yaml:"read_max,omitempty"`
+}
+
+type PayloadExtract struct {
+	MetricName string `yaml:"metric_name"`
+	JQQuery    string `yaml:"jq_query"`
 }
 
 // Target is a the definition of the check to execute (which rule on which endpoint)
@@ -95,7 +101,7 @@ func (r *Rule) setup(metricMaker MetricMaker) error {
 		if r.HTTPRule == nil {
 			r.HTTPRule = &HTTPRule{}
 		}
-		err := r.HTTPRule.setup()
+		err := r.HTTPRule.setup(metricMaker)
 		return err
 	case "tcp":
 		return nil
@@ -104,7 +110,7 @@ func (r *Rule) setup(metricMaker MetricMaker) error {
 	}
 }
 
-func (r *HTTPRule) setup() error {
+func (r *HTTPRule) setup(metricMaker MetricMaker) error {
 	if r.BodyRegex != "" {
 		if r.BodyContent != "" {
 			return fmt.Errorf("body_regexp and body_content are mutually exclusive")
@@ -124,5 +130,21 @@ func (r *HTTPRule) setup() error {
 	if r.ReadMax == 0 {
 		r.ReadMax = DefaultReadMax
 	}
+	if r.PayloadExtract != nil {
+		if err := r.PayloadExtract.setup(metricMaker); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *PayloadExtract) setup(metricMaker MetricMaker) error {
+	if p.JQQuery == "" {
+		return fmt.Errorf("payload_extract jq_query must be non empty")
+	}
+	if p.MetricName == "" {
+		return fmt.Errorf("payload_extract metric_name must be non empty")
+	}
+	metricMaker.MakeMetric(p.MetricName)
 	return nil
 }
