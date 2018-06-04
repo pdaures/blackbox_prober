@@ -2,7 +2,6 @@ package pingers
 
 import (
 	"fmt"
-	"net/url"
 	"regexp"
 )
 
@@ -26,23 +25,24 @@ type Configuration struct {
 
 // Rule is a definition of asserts to do on a ping.
 type Rule struct {
-	Type       string    `yaml:"type"`                  // tcp, http or icmp
+	tags       map[string]string
+	Type       string    `yaml:"type"`                  // tcp, http, icmp or mysql
 	Timeout    int       `yaml:"timeout,omitempty"`     // timeout in seconds
 	MetricName string    `yaml:"metric_name,omitempty"` // metric name used for health report, default value is Up
-	HTTPRule   *HTTPRule `yaml:"http,omitempty"`        // is only required for type http
+	HTTPRule   *HTTPRule `yaml:"http,omitempty"`        // is required for type http
 }
 
 // HTTPRule contains the configuration for the list of http checks to do
 type HTTPRule struct {
-	IgnoreHTTPStatus  bool            `yaml:"ignore_http_status,omitempty"` // ignore HTTP status for health report
-	ValidHTTPStatuses []int           `yaml:"statuses,omitempty"`
-	BodyContentBytes  []byte          `yaml:"-"`
-	BodyContent       string          `yaml:"body_content,omitempty"` // if set, the HTTP response body must be BodyContent
-	BodyRegex         string          `yaml:"body_regexp,omitempty"`  // if set, the HTTP response body must match BodyRegex
-	CompiledRegex     *regexp.Regexp  `yaml:"-"`
-	PayloadExtract    *PayloadExtract `yaml:"payload_extract,omitempty"`
-	Insecure          bool            `yaml:"insecure,omitempty"`
-	ReadMax           int64           `yaml:"read_max,omitempty"`
+	IgnoreHTTPStatus   bool            `yaml:"ignore_http_status,omitempty"` // ignore HTTP status for health report
+	ValidHTTPStatuses  []int           `yaml:"statuses,omitempty"`
+	BodyContentBytes   []byte          `yaml:"-"`
+	BodyContent        string          `yaml:"body_content,omitempty"` // if set, the HTTP response body must be BodyContent
+	BodyRegex          string          `yaml:"body_regexp,omitempty"`  // if set, the HTTP response body must match BodyRegex
+	CompiledRegex      *regexp.Regexp  `yaml:"-"`
+	PayloadExtractRule *PayloadExtract `yaml:"payload_extract,omitempty"`
+	Insecure           bool            `yaml:"insecure,omitempty"`
+	ReadMax            int64           `yaml:"read_max,omitempty"`
 }
 
 type PayloadExtract struct {
@@ -53,33 +53,30 @@ type PayloadExtract struct {
 // Target is a the definition of the check to execute (which rule on which endpoint)
 type Target struct {
 	Name string
-	URL  *url.URL
+	Addr string
 	Rule *Rule
 }
 
 // NewTargets creates from the configuration the list of Target to be queried, and registers metrics on the way
-func NewTargets(c *Configuration, metricMaker MetricMaker) ([]*Target, error) {
+func NewTargets(c *Configuration) ([]*Target, error) {
 	for _, rule := range c.Rules {
-		err := rule.setup(metricMaker)
+		err := rule.setup()
 		if err != nil {
 			return nil, err
 		}
+		rule.tags = c.Tags
 	}
 
 	targets := []*Target{}
-	for ruleName, URLs := range c.Targets {
+	for ruleName, addrs := range c.Targets {
 		rule, ok := c.Rules[ruleName]
 		if !ok {
 			return nil, fmt.Errorf("unknown rule %s", ruleName)
 		}
-		for _, rawURL := range URLs {
-			parsedURL, err := url.Parse(rawURL)
-			if err != nil {
-				return nil, err
-			}
+		for _, addr := range addrs {
 			targets = append(targets, &Target{
-				Name: rawURL,
-				URL:  parsedURL,
+				Name: addr,
+				Addr: addr,
 				Rule: rule,
 			})
 		}
@@ -87,30 +84,31 @@ func NewTargets(c *Configuration, metricMaker MetricMaker) ([]*Target, error) {
 	return targets, nil
 }
 
-func (r *Rule) setup(metricMaker MetricMaker) error {
+func (r *Rule) setup() error {
 	if r.MetricName == "" {
 		r.MetricName = DefaultMetricName
 	}
 	if r.Timeout == 0 {
 		r.Timeout = DefaultTimeout
 	}
-	metricMaker.MakeMetric(r.MetricName)
 
 	switch r.Type {
 	case "http":
 		if r.HTTPRule == nil {
 			r.HTTPRule = &HTTPRule{}
 		}
-		err := r.HTTPRule.setup(metricMaker)
+		err := r.HTTPRule.setup()
 		return err
 	case "tcp":
+		return nil
+	case "mysql":
 		return nil
 	default:
 		return fmt.Errorf("unsupported type %s, expected http or tcp", r.Type)
 	}
 }
 
-func (r *HTTPRule) setup(metricMaker MetricMaker) error {
+func (r *HTTPRule) setup() error {
 	if r.BodyRegex != "" {
 		if r.BodyContent != "" {
 			return fmt.Errorf("body_regexp and body_content are mutually exclusive")
@@ -130,21 +128,20 @@ func (r *HTTPRule) setup(metricMaker MetricMaker) error {
 	if r.ReadMax == 0 {
 		r.ReadMax = DefaultReadMax
 	}
-	if r.PayloadExtract != nil {
-		if err := r.PayloadExtract.setup(metricMaker); err != nil {
+	if r.PayloadExtractRule != nil {
+		if err := r.PayloadExtractRule.setup(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *PayloadExtract) setup(metricMaker MetricMaker) error {
+func (p *PayloadExtract) setup() error {
 	if p.JQQuery == "" {
 		return fmt.Errorf("payload_extract jq_query must be non empty")
 	}
 	if p.MetricName == "" {
 		return fmt.Errorf("payload_extract metric_name must be non empty")
 	}
-	metricMaker.MakeMetric(p.MetricName)
 	return nil
 }

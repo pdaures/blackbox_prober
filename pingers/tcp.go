@@ -3,29 +3,27 @@ package pingers
 import (
 	"log"
 	"net"
-	"net/url"
+	"strings"
 	"time"
 )
 
-func pingerTCP(url *url.URL, reporter MetricReporter, c *Rule) error {
+func pingerTCP(addr string, reporter MetricReporter, c *Rule) error {
 	timeoutDuration := time.Second * time.Duration(c.Timeout)
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", url.Host, timeoutDuration)
+	conn, err := net.DialTimeout("tcp", addr, timeoutDuration)
+
 	if err != nil {
-		log.Printf("Couldn't connect to %s: %s", url.Host, err)
-		return reporter.ReportSuccess(false, c.MetricName, url)
+		log.Printf("Couldn't connect to %s: %s", addr, err)
+		reporter.ReportSuccess(false, c.MetricName, addrLabel(addr, c.tags))
+		return err
 	}
 	defer conn.Close()
-	if url.Path != "" {
-		conn.SetDeadline(time.Now().Add(timeoutDuration))
+	reporter.ReportLatency(time.Since(start).Seconds(), addrLabel(addr, c.tags))
+	reporter.ReportSuccess(true, c.MetricName, addrLabel(addr, c.tags))
+	return nil
+}
 
-		size, err := readSize(conn)
-		if err != nil {
-			log.Printf("Error reading from %s: %s", url, err)
-			return reporter.ReportSuccess(false, c.MetricName, url)
-		}
-		reporter.ReportSize(size, url)
-	}
-	reporter.ReportLatency(time.Since(start).Seconds(), url)
-	return reporter.ReportSuccess(true, c.MetricName, url)
+func addrLabel(addr string, others map[string]string) map[string]string {
+	hostPort := strings.SplitN(addr, ":", 1)
+	return pingerLabels(addr, hostPort[0], others)
 }

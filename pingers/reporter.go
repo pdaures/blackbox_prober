@@ -1,8 +1,7 @@
 package pingers
 
 import (
-	"fmt"
-	"net/url"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -17,14 +16,15 @@ type MetricMaker interface {
 
 // MetricReporter reports metrics to Prometheus
 type MetricReporter interface {
-	ReportLatency(latency float64, url *url.URL)
-	ReportSize(size int, url *url.URL)
-	ReportHttpStatus(status int, url *url.URL)
-	ReportSuccess(success bool, metricName string, url *url.URL) error
-	ReportValue(val float64, metricName string, url *url.URL) error
+	ReportLatency(latency float64, labels map[string]string)
+	ReportSize(size int, labels map[string]string)
+	ReportHttpStatus(status int, labels map[string]string)
+	ReportSuccess(success bool, metricName string, labels map[string]string)
+	ReportValue(val float64, metricName string, labels map[string]string)
 }
 
 type Reporter struct {
+	mu           *sync.Mutex
 	namespace    string
 	tags         map[string]string
 	tagNames     []string
@@ -43,6 +43,7 @@ func NewReporter(namespace string, tags map[string]string) *Reporter {
 		tagNames = append(tagNames, tagName)
 	}
 	return &Reporter{
+		mu:        &sync.Mutex{},
 		namespace: namespace,
 		tags:      tags,
 		tagNames:  tagNames,
@@ -65,64 +66,50 @@ func NewReporter(namespace string, tags map[string]string) *Reporter {
 	}
 }
 
-func (r *Reporter) ReportLatency(latency float64, url *url.URL) {
-	r.withLabelValues(r.latency, url).Set(latency)
+func (r *Reporter) ReportLatency(latency float64, labels map[string]string) {
+	r.size.With(labels).Set(float64(latency))
 }
 
-func (r *Reporter) ReportSize(size int, url *url.URL) {
-	r.withLabelValues(r.size, url).Set(float64(size))
+func (r *Reporter) ReportSize(size int, labels map[string]string) {
+	r.size.With(labels).Set(float64(size))
 }
 
-func (r *Reporter) ReportHttpStatus(status int, url *url.URL) {
-	r.withLabelValues(r.httpStatus, url).Set(float64(status))
+func (r *Reporter) ReportHttpStatus(status int, labels map[string]string) {
+	r.httpStatus.With(labels).Set(float64(status))
 }
 
-func (r *Reporter) ReportSuccess(success bool, metricName string, url *url.URL) error {
+func (r *Reporter) ReportSuccess(success bool, metricName string, labels map[string]string) {
 	successValue := 0
 	if success {
 		successValue = 1
 	}
-	return r.ReportValue(float64(successValue), metricName, url)
+	r.ReportValue(float64(successValue), metricName, labels)
 }
 
-func (r *Reporter) ReportValue(val float64, metricName string, url *url.URL) error {
-	metric, ok := r.otherMetrics[metricName]
-	if !ok {
-		return fmt.Errorf("metric %s unknown", metricName)
-	}
-	r.withLabelValues(metric, url).Set(val)
-	return nil
+func (r *Reporter) ReportValue(val float64, metricName string, labels map[string]string) {
+	metric := r.getMetric(metricName)
+	metric.With(labels).Set(val)
 }
 
-func (r *Reporter) withLabelValues(g *prometheus.GaugeVec, url *url.URL) prometheus.Gauge {
-	urlStr := url.String()
-	hostname := url.Hostname()
-
-	values := []string{}
-	for _, tagName := range r.tagNames {
-		switch tagName {
-		case urlTag:
-			values = append(values, urlStr)
-		case hostTag:
-			values = append(values, hostname)
-		default:
-			values = append(values, r.tags[tagName])
-		}
+func (r *Reporter) getMetric(name string) *prometheus.GaugeVec {
+	var metric *prometheus.GaugeVec
+	ok := false
+	r.mu.Lock()
+	if metric, ok = r.otherMetrics[name]; !ok {
+		metric = r.makeMetric(name)
 	}
-	return g.WithLabelValues(values...)
+	r.mu.Unlock()
+	return metric
 }
 
-// MakeMetric implements MetricMaker
-func (r *Reporter) MakeMetric(name string) {
-	if _, ok := r.otherMetrics[name]; ok {
-		return
-	}
+func (r *Reporter) makeMetric(name string) *prometheus.GaugeVec {
 	metric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: r.namespace,
 		Name:      name,
 		Help:      name,
 	}, r.tagNames)
 	r.otherMetrics[name] = metric
+	return metric
 }
 
 // Collect implements prometheus.Collector.
@@ -143,4 +130,14 @@ func (r *Reporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, metric := range r.otherMetrics {
 		metric.Describe(ch)
 	}
+}
+
+func pingerLabels(addr string, hostname string, others map[string]string) map[string]string {
+	labels := make(map[string]string)
+	for key, val := range others {
+		labels[key] = val
+	}
+	labels[hostTag] = hostname
+	labels[urlTag] = addr
+	return labels
 }

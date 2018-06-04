@@ -32,13 +32,14 @@ func readSize(r io.Reader) (int, error) {
 func Ping(target *Target, reporter MetricReporter) error {
 	switch target.Rule.Type {
 	case "http":
-		return pingerHTTP(target.URL, reporter, target.Rule)
+		return pingerHTTP(target.Addr, reporter, target.Rule)
 	case "tcp":
-		return pingerTCP(target.URL, reporter, target.Rule)
+		return pingerTCP(target.Addr, reporter, target.Rule)
 	case "icmp":
-		return pingerICMP(target.URL, reporter, target.Rule)
+		return pingerICMP(target.Addr, reporter, target.Rule)
+	case "mysql":
+		return pingerMysql(target.Addr, reporter, target.Rule)
 	default:
 		return fmt.Errorf("no handler for rule type %s", target.Rule.Type)
 	}
-	return nil
 }

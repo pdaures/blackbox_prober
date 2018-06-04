@@ -2,21 +2,24 @@ package pingers
 
 import (
 	"log"
-	"net/url"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 )
 
-func pingerICMP(url *url.URL, reporter MetricReporter, c *Rule) error {
-	hostPort := strings.SplitN(url.Host, ":", 1)
+func pingerICMP(addr string, reporter MetricReporter, c *Rule) error {
 	start := time.Now()
-	err := exec.Command("ping", "-n", "-c", "1", "-W", strconv.Itoa(c.Timeout), hostPort[0]).Run()
+	err := exec.Command("ping", "-n", "-c", "1", "-W", strconv.Itoa(c.Timeout), addr).Run()
 	if err != nil {
-		log.Printf("Couldn't ping %s: %s", url, err)
-		return reporter.ReportSuccess(false, c.MetricName, url)
+		log.Printf("Couldn't ping %s: %v\n", addr, err)
+		reporter.ReportSuccess(false, c.MetricName, hostLabel(addr, c.tags))
+		return err
 	}
-	reporter.ReportLatency(time.Since(start).Seconds(), url)
-	return reporter.ReportSuccess(true, c.MetricName, url)
+	reporter.ReportLatency(time.Since(start).Seconds(), hostLabel(addr, c.tags))
+	reporter.ReportSuccess(true, c.MetricName, hostLabel(addr, c.tags))
+	return nil
+}
+
+func hostLabel(addr string, others map[string]string) map[string]string {
+	return pingerLabels(addr, addr, others)
 }

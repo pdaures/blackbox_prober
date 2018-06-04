@@ -31,6 +31,9 @@ rules:
   tcp_active:
     type: "tcp"
 
+  mysql_up:
+    type: "mysql"
+
 targets:
   http_2xx:
     - "http://localhost:8090/healthz"
@@ -41,4 +44,7 @@ targets:
     - "http://localhost:8085/healthz"
 
   tcp_active:
-    - "tcp://localhost:3306"
+    - "localhost:3306"
+
+  mysql_up:
+    - "user:pass@protocol(host:port)/db"

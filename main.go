@@ -57,7 +57,7 @@ type collector struct {
 
 func newCollector(conf *pingers.Configuration) (*collector, error) {
 	reporter := pingers.NewReporter(conf.Namespace, conf.Tags)
-	targets, err := pingers.NewTargets(conf, reporter)
+	targets, err := pingers.NewTargets(conf)
 	if err != nil {
 		return nil, err
 	}
